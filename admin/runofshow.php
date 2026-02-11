@@ -142,6 +142,16 @@ include __DIR__ . '/../includes/header.php';
                     <a href="combined-dashboard.php?conference_id=<?php echo $conferenceId; ?>" class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition">
                         ← Dashboard
                     </a>
+                    <a href="../api/export.php?conference_id=<?php echo $conferenceId; ?>&day=<?php echo $currentDay; ?>&format=csv" 
+                       class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition"
+                       download>
+                        📊 Export CSV
+                    </a>
+                    <a href="../api/export.php?conference_id=<?php echo $conferenceId; ?>&day=<?php echo $currentDay; ?>&format=print" 
+                       target="_blank"
+                       class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg transition">
+                        🖨️ Print/PDF
+                    </a>
                     <a href="/overlay/runofshow-display.php?conference=<?php echo e($conference['uuid']); ?>&day=<?php echo $currentDay; ?>" target="_blank" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition">
                         📺 Stage Display
                     </a>

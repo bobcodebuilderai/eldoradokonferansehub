@@ -151,3 +151,62 @@ CREATE TABLE IF NOT EXISTS activity_log (
 CREATE INDEX idx_activity_conference ON activity_log(conference_id);
 CREATE INDEX idx_activity_user ON activity_log(user_id);
 CREATE INDEX idx_activity_created ON activity_log(created_at);
+
+-- ============================================
+-- 7. RUN OF SHOW COMMENTS
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS ros_comments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    block_id INT NOT NULL,
+    user_id INT NOT NULL,
+    comment TEXT NOT NULL,
+    comment_type ENUM('general', 'technical', 'urgent', 'presenter') DEFAULT 'general',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (block_id) REFERENCES run_of_show_blocks(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_ros_comments_block ON ros_comments(block_id);
+CREATE INDEX idx_ros_comments_user ON ros_comments(user_id);
+CREATE INDEX idx_ros_comments_created ON ros_comments(created_at);
+
+-- Track which comments have been read by which users
+CREATE TABLE IF NOT EXISTS ros_comment_reads (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    comment_id INT NOT NULL,
+    user_id INT NOT NULL,
+    read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (comment_id) REFERENCES ros_comments(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_read (comment_id, user_id)
+);
+
+-- ============================================
+-- 8. USER PHONE NUMBERS (for SMS)
+-- ============================================
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20) DEFAULT NULL;
+ALTER TABLE users ADD INDEX idx_users_phone (phone);
+
+-- ============================================
+-- 9. SMS NOTIFICATION LOG
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS sms_log (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT,
+    conference_id INT,
+    phone_number VARCHAR(20) NOT NULL,
+    message TEXT NOT NULL,
+    gateway_response VARCHAR(100),
+    status ENUM('pending', 'sent', 'failed', 'delivered') DEFAULT 'pending',
+    sent_at TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (conference_id) REFERENCES conferences(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_sms_log_user ON sms_log(user_id);
+CREATE INDEX idx_sms_log_conference ON sms_log(conference_id);
+CREATE INDEX idx_sms_log_status ON sms_log(status);
