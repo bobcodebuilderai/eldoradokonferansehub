@@ -45,6 +45,9 @@ $currentLang = getCurrentLanguage();
                     <!-- Navigation Links -->
                     <div class="hidden md:flex items-center space-x-2 mr-4">
                         <a href="dashboard.php" class="px-3 py-1 rounded text-sm text-white hover:bg-white/20 transition"><?php echo __('dashboard'); ?></a>
+                        <?php if (isVenueAdmin()): ?>
+                            <a href="venue-admin.php" class="px-3 py-1 rounded text-sm bg-indigo-500 text-white font-medium hover:bg-indigo-600 transition">🏢 Venue Admin</a>
+                        <?php endif; ?>
                         <?php if (isset($_GET['conference_id'])): ?>
                             <a href="combined-dashboard.php?conference_id=<?php echo intval($_GET['conference_id']); ?>" class="px-3 py-1 rounded text-sm bg-white/20 text-white font-medium hover:bg-white/30 transition">Kombinert dashboard</a>
                         <?php endif; ?>
