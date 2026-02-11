@@ -23,7 +23,7 @@ function requireLogin() {
 }
 
 /**
- * Get current user
+ * Get current user with role information
  */
 function getCurrentUser() {
     if (!isLoggedIn()) {
@@ -31,9 +31,60 @@ function getCurrentUser() {
     }
     
     $db = getDB();
-    $stmt = $db->prepare("SELECT id, username, email, created_at FROM users WHERE id = ?");
+    $stmt = $db->prepare("
+        SELECT u.*, r.name as role_name, r.description as role_description
+        FROM users u
+        LEFT JOIN roles r ON u.role_id = r.id
+        WHERE u.id = ?
+    ");
     $stmt->execute([$_SESSION['user_id']]);
     return $stmt->fetch();
+}
+
+/**
+ * Check if user is admin
+ */
+function isAdmin() {
+    $user = getCurrentUser();
+    return $user && ($user['role_name'] === 'admin' || $user['is_venue_admin']);
+}
+
+/**
+ * Check if user is venue admin
+ */
+function isVenueAdmin() {
+    $user = getCurrentUser();
+    return $user && ($user['role_name'] === 'venue_admin' || $user['is_venue_admin'] || $user['role_name'] === 'admin');
+}
+
+/**
+ * Check if user can access conference
+ */
+function canAccessConference($conferenceId) {
+    if (!isLoggedIn()) {
+        return false;
+    }
+    
+    // Venue admins and admins can access all conferences
+    if (isVenueAdmin()) {
+        return true;
+    }
+    
+    // Check if user owns the conference
+    $db = getDB();
+    $stmt = $db->prepare("SELECT id FROM conferences WHERE id = ? AND user_id = ?");
+    $stmt->execute([$conferenceId, $_SESSION['user_id']]);
+    return $stmt->fetch() !== false;
+}
+
+/**
+ * Require venue admin access
+ */
+function requireVenueAdmin() {
+    if (!isVenueAdmin()) {
+        setFlashMessage('error', 'You do not have permission to access this page.');
+        redirect('/admin/dashboard.php');
+    }
 }
 
 /**
@@ -41,7 +92,12 @@ function getCurrentUser() {
  */
 function loginUser($username, $password) {
     $db = getDB();
-    $stmt = $db->prepare("SELECT id, username, password_hash FROM users WHERE username = ? OR email = ?");
+    $stmt = $db->prepare("
+        SELECT u.id, u.username, u.password_hash, u.is_venue_admin, r.name as role_name
+        FROM users u
+        LEFT JOIN roles r ON u.role_id = r.id
+        WHERE u.username = ? OR u.email = ?
+    ");
     $stmt->execute([$username, $username]);
     $user = $stmt->fetch();
     
@@ -49,6 +105,8 @@ function loginUser($username, $password) {
         session_regenerate_id(true);
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['username'] = $user['username'];
+        $_SESSION['role_name'] = $user['role_name'];
+        $_SESSION['is_venue_admin'] = $user['is_venue_admin'];
         return true;
     }
     
