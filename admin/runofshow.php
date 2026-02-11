@@ -6,6 +6,8 @@
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/runofshow.php';
+require_once __DIR__ . '/../includes/comments.php';
+require_once __DIR__ . '/../includes/notifications.php';
 require_once __DIR__ . '/../config/database.php';
 
 if (!isLoggedIn()) {
@@ -111,8 +113,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'set_status') {
         $blockId = intval($_POST['block_id'] ?? 0);
         $status = $_POST['status'] ?? 'pending';
+        $block = getROSBlock($blockId);
         setBlockStatus($blockId, $status);
+        
+        // Notify venue team of important status changes
+        if (in_array($status, ['active', 'completed'])) {
+            $statusText = $status === 'active' ? 'STARTED' : 'COMPLETED';
+            notifyVenueTeam(
+                $conferenceId,
+                "Run of Show Update: {$block['title']} {$statusText}",
+                "Block '{$block['title']}' has {$statusText} in the conference schedule.",
+                'normal'
+            );
+        }
+        
         setFlashMessage('success', 'Status updated.');
+    } elseif ($action === 'add_comment') {
+        $blockId = intval($_POST['block_id'] ?? 0);
+        $comment = trim($_POST['comment'] ?? '');
+        $commentType = $_POST['comment_type'] ?? 'general';
+        
+        if ($comment) {
+            addBlockComment($blockId, $_SESSION['user_id'], $comment, $commentType);
+            setFlashMessage('success', 'Comment added.');
+        }
+    } elseif ($action === 'delete_comment') {
+        $commentId = intval($_POST['comment_id'] ?? 0);
+        deleteBlockComment($commentId, $_SESSION['user_id']);
+        setFlashMessage('success', 'Comment deleted.');
     }
     
     redirect('/admin/runofshow.php?conference_id=' . $conferenceId . '&day=' . $currentDay);
@@ -263,6 +291,14 @@ include __DIR__ . '/../includes/header.php';
                                                             <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm">✓ Complete</button>
                                                         </form>
                                                     <?php endif; ?>
+                                                    <button onclick="toggleComments(<?php echo $block['id']; ?>)" class="text-gray-600 hover:text-gray-800 text-sm">
+                                                        💬 Comments
+                                                        <?php 
+                                                        $commentCount = count(getBlockComments($block['id']));
+                                                        if ($commentCount > 0): ?>
+                                                            <span class="bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded-full ml-1"><?php echo $commentCount; ?></span>
+                                                        <?php endif; ?>
+                                                    </button>
                                                     <button onclick="editBlock(<?php echo htmlspecialchars(json_encode($block)); ?>)" class="text-blue-600 hover:text-blue-800 text-sm">Edit</button>
                                                     <form method="POST" class="inline" onsubmit="return confirm('Delete this block?')">
                                                         <input type="hidden" name="action" value="delete">
@@ -272,6 +308,55 @@ include __DIR__ . '/../includes/header.php';
                                                 </div>
                                             </div>
                                         </div>
+                                    </div>
+                                    
+                                    <!-- Comments Section (Hidden by default) -->
+                                    <div id="comments-<?php echo $block['id']; ?>" class="hidden mt-4 ml-28 bg-gray-50 rounded-lg p-4">
+                                        <h4 class="font-medium text-gray-700 mb-3">Comments</h4>
+                                        
+                                        <!-- Existing Comments -->
+                                        <div class="space-y-3 mb-4 max-h-60 overflow-y-auto">
+                                            <?php 
+                                            $comments = getBlockComments($block['id']);
+                                            foreach ($comments as $comment): 
+                                                $formatted = formatComment($comment);
+                                            ?>
+                                                <div class="bg-white rounded-lg p-3 shadow-sm">
+                                                    <div class="flex justify-between items-start mb-1">
+                                                        <span class="font-medium text-sm"><?php echo $formatted['author']; ?> <?php echo $formatted['type_badge']; ?></span>
+                                                        <span class="text-xs text-gray-500"><?php echo $formatted['time']; ?></span>
+                                                    </div>
+                                                    <p class="text-gray-700 text-sm"><?php echo $formatted['text']; ?></p>
+                                                    <?php if ($comment['user_id'] == $_SESSION['user_id'] || isVenueAdmin()): ?>
+                                                        <form method="POST" class="mt-2">
+                                                            <input type="hidden" name="action" value="delete_comment">
+                                                            <input type="hidden" name="comment_id" value="<?php echo $comment['id']; ?>">
+                                                            <button type="submit" class="text-xs text-red-500 hover:text-red-700">Delete</button>
+                                                        </form>
+                                                    <?php endif; ?>
+                                                </div>
+                                            <?php endforeach; ?>
+                                            <?php if (empty($comments)): ?>
+                                                <p class="text-gray-400 text-sm italic">No comments yet</p>
+                                            <?php endif; ?>
+                                        </div>
+                                        
+                                        <!-- Add Comment Form -->
+                                        <form method="POST" class="mt-3">
+                                            <input type="hidden" name="action" value="add_comment">
+                                            <input type="hidden" name="block_id" value="<?php echo $block['id']; ?>">
+                                            <div class="flex gap-2">
+                                                <select name="comment_type" class="border rounded-lg px-2 py-1 text-sm">
+                                                    <option value="general">General</option>
+                                                    <option value="technical">Technical</option>
+                                                    <option value="urgent">Urgent</option>
+                                                    <option value="presenter">Presenter</option>
+                                                </select>
+                                                <input type="text" name="comment" placeholder="Add a comment..." required 
+                                                       class="flex-1 border rounded-lg px-3 py-1 text-sm">
+                                                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">Post</button>
+                                            </div>
+                                        </form>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
@@ -484,6 +569,14 @@ function resetForm() {
 document.querySelectorAll('.block-item').forEach(item => {
     item.draggable = true;
 });
+
+// Toggle comments visibility
+function toggleComments(blockId) {
+    const commentsSection = document.getElementById('comments-' + blockId);
+    if (commentsSection) {
+        commentsSection.classList.toggle('hidden');
+    }
+}
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

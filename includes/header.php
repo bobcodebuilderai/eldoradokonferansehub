@@ -58,6 +58,7 @@ $currentLang = getCurrentLanguage();
                         <a href="?lang=en" class="px-2 py-1 rounded text-sm <?php echo $currentLang === 'en' ? 'bg-white text-purple-600 font-bold' : 'text-white hover:bg-white/20'; ?>">EN</a>
                     </div>
                     <span class="text-sm"><?php echo __('welcome'); ?>, <?php echo e($_SESSION['username']); ?></span>
+                    <a href="profile.php" class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded text-sm font-medium transition">👤 Profile</a>
                     <a href="logout.php" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded text-sm font-medium transition"><?php echo __('logout'); ?></a>
                 </div>
             </div>

@@ -210,3 +210,33 @@ CREATE TABLE IF NOT EXISTS sms_log (
 CREATE INDEX idx_sms_log_user ON sms_log(user_id);
 CREATE INDEX idx_sms_log_conference ON sms_log(conference_id);
 CREATE INDEX idx_sms_log_status ON sms_log(status);
+
+-- ============================================
+-- 10. NOTIFICATION PREFERENCES
+-- ============================================
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS notification_method ENUM('email', 'sms', 'both', 'none') DEFAULT 'email';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_notifications BOOLEAN DEFAULT TRUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS sms_notifications BOOLEAN DEFAULT FALSE;
+
+-- ============================================
+-- 11. NOTIFICATION LOG
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS notification_log (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT,
+    conference_id INT,
+    type ENUM('sms', 'email') NOT NULL,
+    subject VARCHAR(255),
+    message TEXT,
+    status ENUM('pending', 'sent', 'failed', 'delivered') DEFAULT 'pending',
+    sent_at TIMESTAMP NULL,
+    error_message TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (conference_id) REFERENCES conferences(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_notification_log_user ON notification_log(user_id);
+CREATE INDEX idx_notification_log_conference ON notification_log(conference_id);
